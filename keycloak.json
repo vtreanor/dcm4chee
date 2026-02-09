@@ -1,0 +1,8 @@
+{
+  "realm": "dcm4che",
+  "clientId": "dcm4chee-arc-ui",
+  "url": "http://auth.osirl.com:8080",
+  "ssl-required": "none",
+  "public-client": true,
+  "confidential-port": 0
+}

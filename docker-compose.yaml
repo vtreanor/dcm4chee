@@ -1,0 +1,244 @@
+services:
+  #test text
+  # Traefik Dashboard: http://<your-domain>:8080/dashboard/
+  traefik:
+    image: "traefik:v3.6"
+    container_name: "traefik"
+    networks:
+      - proxy
+    command:
+      - "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # HTTP entrypoint
+      - "--entryPoints.web.address=:80"
+      # LDAP entrypoints (TCP)
+      - "--entryPoints.ldap.address=:389" 
+      - "--entryPoints.ldaps.address=:636"
+    ports:
+      - "80:80"         # http
+      - "8080:8080"     # Traefik Dashboard
+      - "389:389"       # ldap
+      - "636:636"       # ldaps
+      - "443:443"       # https
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+  keycloak:
+    # image: quay.io/keycloak/keycloak:26.0
+    image: dcm4che/keycloak:26.0.6
+    networks:
+      - proxy
+    environment:
+      KC_DB: postgres 
+      KC_DB_URL: jdbc:postgresql://db:5432/pacsdb 
+      KC_DB_USERNAME: pacs 
+      KC_DB_PASSWORD: pacs
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: changeit
+      KC_HOSTNAME: auth.osirl.com
+      KC_HOSTNAME_PATH: /auth
+      KC_PROXY: edge
+      KC_HOSTNAME_STRICT: "false" 
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true" 
+      KC_HTTP_PORT: "8080"
+
+    labels:
+      - "traefik.enable=true"
+      # - "traefik.http.routers.keycloak.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.keycloak.rule=Host(`auth.osirl.com`)"
+      - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.services.keycloak.loadbalancer.server.scheme=http"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+      # Optional: healthcheck to avoid early 502s during startup 
+      - "traefik.http.services.keycloak.loadbalancer.healthcheck.path=/realms/master" 
+      - "traefik.http.services.keycloak.loadbalancer.healthcheck.interval=5s" 
+      - "traefik.http.services.keycloak.loadbalancer.healthcheck.timeout=3s"
+
+  mariadb:
+    image: mariadb:10.11.4
+    networks: 
+      - proxy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: keycloak
+      MYSQL_USER: keycloak
+      MYSQL_PASSWORD: keycloak
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/local/dcm4chee-arc/mysql:/var/lib/mysql
+
+  ldap:
+    image: dcm4che/slapd-dcm4chee:2.6.10-34.2
+    container_name: ldap
+    networks: 
+      - proxy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    environment:
+      LDAP_BASE_DN: dc=dcm4che,dc=org 
+      LDAP_ADMIN_PASSWORD: secret
+      STORAGE_DIR: /storage/fs1
+    labels: 
+      - "traefik.enable=true" 
+      # LDAP (unencrypted TCP) 
+      - "traefik.tcp.routers.ldap.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.ldap.tls=false"
+      - "traefik.tcp.routers.ldap.entrypoints=ldap" 
+      - "traefik.tcp.services.ldap.loadbalancer.server.port=389" 
+    
+    volumes:
+      - /var/local/dcm4chee-arc/ldap:/var/lib/openldap/openldap-data
+      - /var/local/dcm4chee-arc/slapd.d:/etc/openldap/slapd.d
+
+  db:
+    image: dcm4che/postgres-dcm4chee:17.4-34
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    ports:
+      - "5432:5432"
+    networks: 
+      - proxy
+    environment:
+      POSTGRES_DB: pacsdb
+      POSTGRES_USER: pacs
+      POSTGRES_PASSWORD: pacs
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/local/dcm4chee-arc/db:/var/lib/postgresql/data
+
+  # mariadb:
+  #   image: mariadb:10.11.4
+  #   networks: 
+  #     - proxy
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "10m"
+  #   ports:
+  #     - "3306:3306"
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: secret
+  #     MYSQL_DATABASE: keycloak
+  #     MYSQL_USER: keycloak
+  #     MYSQL_PASSWORD: keycloak
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - /etc/timezone:/etc/timezone:ro
+  #     - /var/local/dcm4chee-arc/mysql:/var/lib/mysql
+
+  arc:
+    image: dcm4che/dcm4chee-arc-psql:5.34.2-secure
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+
+      # Router: only match the archive path
+      - "traefik.http.routers.arc.rule=Host(`pacs.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
+      - "traefik.http.routers.arc.entrypoints=web"
+
+      # Middleware: strip the prefix before sending to WildFly
+      - "traefik.http.middlewares.arc-strip.stripprefix.prefixes=/dcm4chee-arc"
+      - "traefik.http.routers.arc.middlewares=arc-strip"
+
+      # Service: ARC listens on 8080 internally
+      - "traefik.http.services.arc.loadbalancer.server.port=8080"
+
+    ports:
+      - "8443:8443"
+      - "9990:9990"
+      - "9993:9993"
+      - "11112:11112"
+      - "2762:2762"
+      - "2575:2575"
+      - "12575:12575"
+    environment:
+      WILDFLY_LOGLEVEL: INFO 
+      WILDFLY_LOGLEVEL_ORG_KEYCLOAK: DEBUG 
+      WILDFLY_LOGLEVEL_ORG_DCM4CHE: DEBUG 
+      WILDFLY_LOGLEVEL_ORG_DCM4CHEE: DEBUG 
+      WILDFLY_LOGLEVEL_ORG_JBOSS_AS: DEBUG
+      POSTGRES_DB: pacsdb
+      POSTGRES_USER: pacs
+      POSTGRES_PASSWORD: pacs
+      AUTH_SERVER_URL: http://auth.osirl.com:8080 
+      UI_AUTH_SERVER_URL: http://auth.osirl.com:8080
+      # AUTH_SERVER_URL: http://osirl.com:8080 
+      # UI_AUTH_SERVER_URL: http://osirl.com:8080
+      # AUTH_SERVER_URL: http://keycloak:8080 
+      # UI_AUTH_SERVER_URL: http://keycloak:8080
+      WILDFLY_CHOWN: /storage
+      WILDFLY_WAIT_FOR: ldap:389 db:5432 keycloak:8080
+    depends_on:
+      - ldap
+      - keycloak
+      - db
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/local/dcm4chee-arc/wildfly:/opt/wildfly/standalone
+      - /var/local/dcm4chee-arc/storage:/storage
+      - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2.war/keycloak.json
+
+
+
+  # arc:
+  #   image: dcm4che/dcm4chee-arc-psql:5.34.2-secure
+  #   networks:
+  #     - proxy
+  #   ports:
+  #     # - "8080:8080"     # this line produces .. port is already allocated
+  #     - "8443:8443"
+  #     - "9990:9990"
+  #     - "9993:9993"
+  #     - "11112:11112"
+  #     - "2762:2762"
+  #     - "2575:2575"
+  #     - "12575:12575"
+  #   environment:
+  #     POSTGRES_DB: pacsdb
+  #     POSTGRES_USER: pacs
+  #     POSTGRES_PASSWORD: pacs
+  #     AUTH_SERVER_URL: https://keycloak:8843
+  #     UI_AUTH_SERVER_URL: https://${whoami_ip}:8843
+  #     WILDFLY_CHOWN: /storage
+  #     WILDFLY_WAIT_FOR: ldap:389 db:5432 keycloak:8843
+  #   depends_on:
+  #     - ldap
+  #     - keycloak
+  #     - db
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - /etc/timezone:/etc/timezone:ro
+  #     - /var/local/dcm4chee-arc/wildfly:/opt/wildfly/standalone
+  #     - /var/local/dcm4chee-arc/storage:/storage
+
+  # whoami: http://<your-domain>/whoami
+  whoami:
+    image: "traefik/whoami"
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`${whoami_ip}`) && PathPrefix(`/whoami`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
+
+networks:
+  proxy:
+    name: proxy
