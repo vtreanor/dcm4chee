@@ -121,26 +121,6 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /var/local/dcm4chee-arc/db:/var/lib/postgresql/data
 
-  # mariadb:
-  #   image: mariadb:10.11.4
-  #   networks: 
-  #     - proxy
-  #   logging:
-  #     driver: json-file
-  #     options:
-  #       max-size: "10m"
-  #   ports:
-  #     - "3306:3306"
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: secret
-  #     MYSQL_DATABASE: keycloak
-  #     MYSQL_USER: keycloak
-  #     MYSQL_PASSWORD: keycloak
-  #   volumes:
-  #     - /etc/localtime:/etc/localtime:ro
-  #     - /etc/timezone:/etc/timezone:ro
-  #     - /var/local/dcm4chee-arc/mysql:/var/lib/mysql
-
   arc:
     image: dcm4che/dcm4chee-arc-psql:5.34.2-secure
     networks:
@@ -195,38 +175,6 @@ services:
       - /var/local/dcm4chee-arc/storage:/storage
       - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2.war/keycloak.json
 
-
-
-  # arc:
-  #   image: dcm4che/dcm4chee-arc-psql:5.34.2-secure
-  #   networks:
-  #     - proxy
-  #   ports:
-  #     # - "8080:8080"     # this line produces .. port is already allocated
-  #     - "8443:8443"
-  #     - "9990:9990"
-  #     - "9993:9993"
-  #     - "11112:11112"
-  #     - "2762:2762"
-  #     - "2575:2575"
-  #     - "12575:12575"
-  #   environment:
-  #     POSTGRES_DB: pacsdb
-  #     POSTGRES_USER: pacs
-  #     POSTGRES_PASSWORD: pacs
-  #     AUTH_SERVER_URL: https://keycloak:8843
-  #     UI_AUTH_SERVER_URL: https://${whoami_ip}:8843
-  #     WILDFLY_CHOWN: /storage
-  #     WILDFLY_WAIT_FOR: ldap:389 db:5432 keycloak:8843
-  #   depends_on:
-  #     - ldap
-  #     - keycloak
-  #     - db
-  #   volumes:
-  #     - /etc/localtime:/etc/localtime:ro
-  #     - /etc/timezone:/etc/timezone:ro
-  #     - /var/local/dcm4chee-arc/wildfly:/opt/wildfly/standalone
-  #     - /var/local/dcm4chee-arc/storage:/storage
 
   # whoami: http://<your-domain>/whoami
   whoami:
