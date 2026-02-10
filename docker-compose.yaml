@@ -38,7 +38,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: changeit
       KC_HOSTNAME: auth.osirl.com
-      KC_HOSTNAME_PATH: /auth
+      # KC_HOSTNAME_PATH: /auth
       KC_PROXY: edge
       KC_HOSTNAME_STRICT: "false" 
       KC_HOSTNAME_STRICT_HTTPS: "false"
@@ -133,8 +133,8 @@ services:
       - "traefik.http.routers.arc.entrypoints=web"
 
       # Middleware: strip the prefix before sending to WildFly
-      - "traefik.http.middlewares.arc-strip.stripprefix.prefixes=/dcm4chee-arc"
-      - "traefik.http.routers.arc.middlewares=arc-strip"
+      # - "traefik.http.middlewares.arc-strip.stripprefix.prefixes=/dcm4chee-arc"
+      # - "traefik.http.routers.arc.middlewares=arc-strip"
 
       # Service: ARC listens on 8080 internally
       - "traefik.http.services.arc.loadbalancer.server.port=8080"
@@ -156,8 +156,8 @@ services:
       POSTGRES_DB: pacsdb
       POSTGRES_USER: pacs
       POSTGRES_PASSWORD: pacs
-      AUTH_SERVER_URL: http://auth.osirl.com:8080 
-      UI_AUTH_SERVER_URL: http://auth.osirl.com:8080
+      AUTH_SERVER_URL: http://auth.osirl.com 
+      UI_AUTH_SERVER_URL: http://auth.osirl.com
       # AUTH_SERVER_URL: http://osirl.com:8080 
       # UI_AUTH_SERVER_URL: http://osirl.com:8080
       # AUTH_SERVER_URL: http://keycloak:8080 
