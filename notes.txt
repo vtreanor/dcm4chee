@@ -1,0 +1,17 @@
+
+✕ archive.osirl.com
+✓ auth.osirl.com          - "traefik.http.routers.keycloak.rule=Host(`auth.osirl.com`)"  # Keycloak
+✕ ldap.osirl.com
+✓ pacs.osirl.com            WildFly
+✓ traefik.osirl.com:8080   Traefik dashboard
+✓ whoami.osirl.com         - "traefik.http.routers.whoami.rule=Host(`whoami.osirl.com`)"  # Whomi service
+
+- "traefik.http.routers.arc.rule=Host(`pacs.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
+
+About to add user 'vincent' for realm 'ManagementRealm'
+Is this correct yes/no? yes
+Added user 'vincent' to file '/opt/wildfly/standalone/configuration/mgmt-users.properties'
+Added user 'vincent' to file '/opt/wildfly/domain/configuration/mgmt-users.properties'
+Added user 'vincent' with groups  to file '/opt/wildfly/standalone/configuration/mgmt-groups.properties'
+Added user 'vincent' with groups  to file '/opt/wildfly/domain/configuration/mgmt-groups.properties'
+# password is treanor.75
