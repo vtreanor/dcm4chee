@@ -38,7 +38,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: changeit
       KC_HOSTNAME: auth.osirl.com
-      # KC_HOSTNAME_PATH: /auth
+      KC_HOSTNAME_PATH: /auth
       KC_PROXY: edge
       KC_HOSTNAME_STRICT: "false" 
       KC_HOSTNAME_STRICT_HTTPS: "false"
@@ -121,7 +121,6 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /var/local/dcm4chee-arc/db:/var/lib/postgresql/data
 
-  # http://pacs.osirl.com/dcm4chee-arc/ui2/
   arc:
     image: dcm4che/dcm4chee-arc-psql:5.34.2-secure
     networks:
@@ -134,8 +133,8 @@ services:
       - "traefik.http.routers.arc.entrypoints=web"
 
       # Middleware: strip the prefix before sending to WildFly
-      # - "traefik.http.middlewares.arc-strip.stripprefix.prefixes=/dcm4chee-arc"
-      # - "traefik.http.routers.arc.middlewares=arc-strip"
+      - "traefik.http.middlewares.arc-strip.stripprefix.prefixes=/dcm4chee-arc"
+      - "traefik.http.routers.arc.middlewares=arc-strip"
 
       # Service: ARC listens on 8080 internally
       - "traefik.http.services.arc.loadbalancer.server.port=8080"
@@ -157,10 +156,8 @@ services:
       POSTGRES_DB: pacsdb
       POSTGRES_USER: pacs
       POSTGRES_PASSWORD: pacs
-      AUTH_SERVER_URL: http://auth.osirl.com 
-      UI_AUTH_SERVER_URL: http://auth.osirl.com
-      # AUTH_SERVER_URL: http://auth.osirl.com:8080 
-      # UI_AUTH_SERVER_URL: http://auth.osirl.com:8080
+      AUTH_SERVER_URL: http://auth.osirl.com:8080 
+      UI_AUTH_SERVER_URL: http://auth.osirl.com:8080
       # AUTH_SERVER_URL: http://osirl.com:8080 
       # UI_AUTH_SERVER_URL: http://osirl.com:8080
       # AUTH_SERVER_URL: http://keycloak:8080 
@@ -174,10 +171,9 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      # - /var/local/dcm4chee-arc/wildfly:/opt/wildfly/standalone
+      - /var/local/dcm4chee-arc/wildfly:/opt/wildfly/standalone
       - /var/local/dcm4chee-arc/storage:/storage
-      # - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2-5.34.2-secure.war/keycloak.json
-      # - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2.war/keycloak.json
+      - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2.war/keycloak.json
 
 
   # whoami: http://<your-domain>/whoami
@@ -188,8 +184,7 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`whoami.osirl.com`)"
-      # - "traefik.http.routers.whoami.rule=Host(`${whoami_ip}`) && PathPrefix(`/whoami`)"
+      - "traefik.http.routers.whoami.rule=Host(`${whoami_ip}`) && PathPrefix(`/whoami`)"
       - "traefik.http.routers.whoami.entrypoints=web"
 
 networks:
