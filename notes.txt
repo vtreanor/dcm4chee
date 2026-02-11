@@ -15,3 +15,20 @@ Added user 'vincent' to file '/opt/wildfly/domain/configuration/mgmt-users.prope
 Added user 'vincent' with groups  to file '/opt/wildfly/standalone/configuration/mgmt-groups.properties'
 Added user 'vincent' with groups  to file '/opt/wildfly/domain/configuration/mgmt-groups.properties'
 # password is treanor.75
+
+
+New day. Overnight I have retrieved the best point state from yesterday. 
+This is where we are this morning
+
+1. http://pacs.osirl.com/dcm4chee-arc/ui2
+2. http://auth.osirl.com/realms/dcm4che/protocol/openid-connect/auth?response_type=code&client_id=dcm4chee-arc-ui&redirect_uri=http%3A%2F%2Fpacs.osirl.com%2Fdcm4chee-arc%2Fui2&state=421b24f4-2bd7-4563-9394-d73d220e6691&scope=openid&nonce=-WYfGBTDRc2soSFrxUGV1h-KHgQZNnWDZEkeGh7HclY
+3. http://pacs.osirl.com/dcm4chee-arc/ui2/en/index.html
+4. https://keycloak:8443/realms/dcm4che/protocol/openid-connect/auth?client_id=dcm4chee-arc-ui&redirect_uri=http%3A%2F%2Fpacs.osirl.com%2Fdcm4chee-arc%2Fui2%2Fen%2Findex.html&state=7e64a914-74f3-447c-8b2f-3bcb1a1147bf&response_mode=fragment&response_type=code&scope=openid&nonce=a730009a-a011-4882-8137-7b57e2a5e3ba&code_challenge=TyRogpRH4eM9d-uWAG2BkbgBTeVurW52k_RqN01lIaE&code_challenge_method=S256
+
+The above is the sequence as of now
+1. is the PACS entry point. This rediects to:
+2. This is the PACS login page waiting for username and password. enter these and redirect to:
+3. This is the standard PACS working UI. After 5 seconds redirects to:
+4. This eventually resolves to Server not found .. can't connect to the server at keycloak
+
+Step 4 is the rogue state and step 3 is where the sequence should end.
