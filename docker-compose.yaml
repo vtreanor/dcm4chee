@@ -126,18 +126,52 @@ services:
     networks:
       - proxy
     labels:
-      - "traefik.enable=true"
-
-      # Router: only match the archive path
-      - "traefik.http.routers.arc.rule=Host(`pacs.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
-      - "traefik.http.routers.arc.entrypoints=web"
-
-      # Middleware: strip the prefix before sending to WildFly
-      # - "traefik.http.middlewares.arc-strip.stripprefix.prefixes=/dcm4chee-arc"
-      # - "traefik.http.routers.arc.middlewares=arc-strip"
-
-      # Service: ARC listens on 8080 internally
+      - "traefik.enable=true" 
+      # Router: match hostname AND prefix 
+      - "traefik.http.routers.arc.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dcm4chee-arc`)" 
+      - "traefik.http.routers.arc.entrypoints=web" 
+      # DO NOT strip the prefix 
+      # DO NOT add a prefix # DO NOT rewrite anything 
+      # Service: WildFly listens on 8080 
       - "traefik.http.services.arc.loadbalancer.server.port=8080"
+      
+      
+      # - "traefik.enable=true"
+
+      # # Router: match the new hostname AND the expected servlet prefix
+      # - "traefik.http.routers.arc.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
+      # - "traefik.http.routers.arc.entrypoints=web"
+
+      # # Middleware: ensure the prefix is preserved (no stripping)
+      # - "traefik.http.middlewares.arc-keep.addprefix.prefix=/dcm4chee-arc"
+      # - "traefik.http.routers.arc.middlewares=arc-keep"
+
+      # # Service: WildFly listens on 8080
+      # - "traefik.http.services.arc.loadbalancer.server.port=8080"
+
+    # labels:
+    #   - "traefik.enable=true"
+
+    #   # Router: match the new hostname
+    #   - "traefik.http.routers.arc.rule=Host(`pacs-ui.osirl.com`)"
+    #   - "traefik.http.routers.arc.entrypoints=web"
+
+    #   # Service: forward to WildFly’s internal port
+    #   - "traefik.http.services.arc.loadbalancer.server.port=8080"
+
+
+      # - "traefik.enable=true"
+
+      # # Router: only match the archive path
+      # - "traefik.http.routers.arc.rule=Host(`pacs.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
+      # - "traefik.http.routers.arc.entrypoints=web"
+
+      # # Middleware: strip the prefix before sending to WildFly
+      # # - "traefik.http.middlewares.arc-strip.stripprefix.prefixes=/dcm4chee-arc"
+      # # - "traefik.http.routers.arc.middlewares=arc-strip"
+
+      # # Service: ARC listens on 8080 internally
+      # - "traefik.http.services.arc.loadbalancer.server.port=8080"
 
     ports:
       - "8443:8443"
@@ -173,7 +207,7 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /var/local/dcm4chee-arc/wildfly:/opt/wildfly/standalone
       - /var/local/dcm4chee-arc/storage:/storage
-      - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2.war/keycloak.json
+      - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2.war/ui2/keycloak.json
 
 
   # whoami: http://<your-domain>/whoami
