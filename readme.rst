@@ -1,5 +1,5 @@
-Architecture (Mermaid)
-======================
+S3‑Backed PACS Architecture (Mermaid)
+====================================
 
 .. code-block:: mermaid
 
@@ -11,6 +11,7 @@ Architecture (Mermaid)
        classDef proxy fill:#ff7f0e,stroke:#8a4600,stroke-width:1px,color:#fff;
        classDef auth fill:#9467bd,stroke:#4b2a6a,stroke-width:1px,color:#fff;
        classDef storage fill:#8c564b,stroke:#4a2d1f,stroke-width:1px,color:#fff;
+       classDef cloud fill:#1f9d55,stroke:#0f4d2c,stroke-width:1px,color:#fff;
 
        %% NODES
        TRAEFIK[Traefik v3<br/>Reverse Proxy]:::proxy
@@ -20,7 +21,8 @@ Architecture (Mermaid)
        LDAP[OpenLDAP<br/>slapd-dcm4chee]:::svc
 
        POSTGRES[(PostgreSQL<br/>pacsdb)]:::db
-       STORAGE[(PACS Storage<br/>Filesystem)]:::storage
+       STORAGE[(Local PACS Storage<br/>Filesystem)]:::storage
+       S3[(Amazon S3<br/>DICOM Object Store)]:::cloud
        LDAPSTORE[(LDAP Storage)]:::storage
 
        %% CONNECTIONS
@@ -30,6 +32,7 @@ Architecture (Mermaid)
 
        ARC --> POSTGRES
        ARC --> STORAGE
+       ARC --> |WADO / C-STORE| S3
 
        KEYCLOAK --> POSTGRES
 
