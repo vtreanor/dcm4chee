@@ -1,207 +1,36 @@
-dcm4chee — PACS Deployment (Traefik + Keycloak + LDAP + Postgres)
-=================================================================
+Architecture (Mermaid)
+======================
 
-This repository contains a fully working, production‑ready deployment of
-**DCM4CHEE Archive 5.34.x** using:
+.. code-block:: mermaid
 
-- Traefik v3 as the reverse proxy
-- Keycloak 26 for authentication (OIDC)
-- PostgreSQL as the PACS database
-- OpenLDAP (slapd-dcm4chee) for directory services
-- WildFly-based dcm4chee-arc with UI2
-- Optional MariaDB for Keycloak (unused in this configuration)
+   flowchart TB
 
-This stack has been validated end‑to‑end, including:
+       %% STYLE DEFINITIONS
+       classDef svc fill:#1f77b4,stroke:#0d3a5a,stroke-width:1px,color:#fff;
+       classDef db fill:#2ca02c,stroke:#145214,stroke-width:1px,color:#fff;
+       classDef proxy fill:#ff7f0e,stroke:#8a4600,stroke-width:1px,color:#fff;
+       classDef auth fill:#9467bd,stroke:#4b2a6a,stroke-width:1px,color:#fff;
+       classDef storage fill:#8c564b,stroke:#4a2d1f,stroke-width:1px,color:#fff;
 
-- PACS UI2 loading correctly
-- OIDC login via Keycloak
-- Correct redirect URIs
-- Traefik routing with preserved path prefixes
-- DICOM C‑STORE SCP operational
-- Stable database and storage volumes
+       %% NODES
+       TRAEFIK[Traefik v3<br/>Reverse Proxy]:::proxy
 
-It represents a **known-good, reproducible baseline** for future development.
+       KEYCLOAK[Keycloak 26<br/>auth.osirl.com]:::auth
+       ARC[DCM4CHEE-ARC<br/>pacs-ui.osirl.com]:::svc
+       LDAP[OpenLDAP<br/>slapd-dcm4chee]:::svc
 
----
+       POSTGRES[(PostgreSQL<br/>pacsdb)]:::db
+       STORAGE[(PACS Storage<br/>Filesystem)]:::storage
+       LDAPSTORE[(LDAP Storage)]:::storage
 
-Architecture Overview
----------------------
+       %% CONNECTIONS
+       TRAEFIK --> |HTTP 80| KEYCLOAK
+       TRAEFIK --> |HTTP 80<br/>PathPrefix /dcm4chee-arc| ARC
+       TRAEFIK --> |TCP 389/636| LDAP
 
-::
+       ARC --> POSTGRES
+       ARC --> STORAGE
 
-                        ┌──────────────────────────┐
-                        │        Traefik v3        │
-                        │(HTTP + TCP reverse proxy)│
-                        └─────────────┬────────────┘
-                                      │
-             ┌────────────────────────┼────────────────────────┐
-             │                        │                        │
-             ▼                        ▼                        ▼
-     ┌────────────────┐     ┌────────────────────┐     ┌──────────────────┐
-     │  Keycloak 26   │     │   dcm4chee-arc     │     │      LDAP        │
-     │ auth.osirl.com │     │ pacs-ui.osirl.com  │     │  slapd-dcm4chee  │
-     └────────────────┘     └────────────────────┘     └──────────────────┘
-             │                        │                        │
-             ▼                        ▼                        ▼
-     ┌────────────────┐     ┌────────────────────┐     ┌──────────────────┐
-     │   Postgres     │     │   Storage (FS)     │     │   LDAP storage   │
-     └────────────────┘     └────────────────────┘     └──────────────────┘
+       KEYCLOAK --> POSTGRES
 
----
-
-Domains Used
-------------
-
-=================  ================================================
-Service            Domain
-=================  ================================================
-PACS UI2           http://pacs-ui.osirl.com/dcm4chee-arc/ui2/
-Keycloak           http://auth.osirl.com
-Traefik Dashboard  http://<host>:8080/dashboard/
-=================  ================================================
-
----
-
-Prerequisites
--------------
-
-- Docker 24+
-- Docker Compose v2
-- DNS entries for:
-
-  - ``auth.osirl.com`` → host IP
-  - ``pacs-ui.osirl.com`` → host IP
-
-- Open ports: 80, 389, 636, 11112, 2762, 2575, 12575
-
----
-
-Running the Stack
------------------
-
-Start everything::
-
-    docker compose up -d
-
-Check logs::
-
-    docker compose logs -f
-
-Stop::
-
-    docker compose down
-
----
-
-Keycloak Setup
---------------
-
-This deployment uses:
-
-- Realm: ``dcm4che``
-- Client: ``dcm4chee-arc-ui``
-
-Required Redirect URIs::
-
-    http://pacs-ui.osirl.com/dcm4chee-arc/ui2/
-    http://pacs-ui.osirl.com/dcm4chee-arc/ui2/*
-    http://pacs-ui.osirl.com/dcm4chee-arc/ui2
-
-Web Origins::
-
-    http://pacs-ui.osirl.com
-
-These settings are required for UI2 to authenticate correctly.
-
----
-
-Traefik Routing
----------------
-
-Traefik routes based on hostname + path prefix::
-
-    traefik.http.routers.arc.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dcm4chee-arc`)
-
-This ensures WildFly receives the **exact** servlet path::
-
-    /dcm4chee-arc/ui2
-
-No prefix stripping or rewriting is used.
-
----
-
-Volumes
--------
-
-Persistent data is stored under::
-
-    /var/local/dcm4chee-arc/
-
-Subdirectories:
-
-- ``wildfly/`` — WildFly standalone configuration
-- ``storage/`` — PACS image storage
-- ``db/`` — PostgreSQL data
-- ``ldap/`` — LDAP data
-- ``slapd.d/`` — LDAP config
-
----
-
-DICOM Services
---------------
-
-======  ==========================
-Port    Service
-======  ==========================
-11112   DICOM C‑STORE SCP
-2762    HL7
-2575    DICOM TLS
-12575   DICOM WebSocket
-======  ==========================
-
----
-
-Troubleshooting
----------------
-
-UI2 shows “Invalid parameter: redirect_uri”
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Check Keycloak client settings — ensure redirect URIs match exactly.
-
-UI2 shows 401 Unauthorized
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Traefik may be rewriting or stripping the path.  
-Ensure::
-
-    PathPrefix(`/dcm4chee-arc`)
-
-is preserved.
-
-Keycloak 502 on startup
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Traefik healthcheck may be too fast.  
-Increase::
-
-    healthcheck.interval
-    healthcheck.timeout
-
----
-
-Branching Strategy
-------------------
-
-- ``main`` — stable, working PACS deployment
-- ``compose-pre-redirect-fix`` — development branch used to reach stability
-
-``main`` now reflects the validated, production‑ready state.
-
----
-
-License
--------
-
-This repository contains configuration for open‑source components.  
-Refer to each component’s upstream license for details.
+       LDAP --> LDAPSTORE
