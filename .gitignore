@@ -3,3 +3,4 @@ keycloak-fail-docker-compose.yaml
 certs/local.crt
 certs/local.key
 dynamic/tls.yaml
+letsencrypt/acme.json
