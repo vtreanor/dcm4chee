@@ -14,12 +14,23 @@ services:
       - "--log.level=DEBUG"
       - "--api.insecure=true"
 
-      # Enable Docker provider (reads labels from containers)
+      # Docker provider
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
 
-      # HTTP entrypoint
+      # HTTP + HTTPS entrypoints
       - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+
+      # Redirect all HTTP → HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+
+      # Let's Encrypt (HTTP challenge)
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.email=admin@osirl.com"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
 
       # LDAP TCP passthrough entrypoints
       - "--entryPoints.ldap.address=:389"
@@ -27,13 +38,15 @@ services:
 
     ports:
       - "80:80"         # HTTP
+      - "443:443"       # HTTPS
       - "8080:8080"     # Traefik dashboard
       - "389:389"       # LDAP (plain TCP)
       - "636:636"       # LDAPS (TLS)
-      - "443:443"       # HTTPS (future use)
 
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+
 
 
   ###########################################################################
@@ -57,6 +70,8 @@ services:
 
       # Public hostname for OIDC
       KC_HOSTNAME: auth.osirl.com
+      KC_HOSTNAME_URL: https://auth.osirl.com
+      KC_PROXY_HEADERS: xforwarded
       KC_PROXY: edge
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
@@ -67,15 +82,31 @@ services:
 
     labels:
       - "traefik.enable=true"
+
+      # HTTPS router
+      - "traefik.http.routers.keycloak-secure.rule=Host(`auth.osirl.com`)"
+      - "traefik.http.routers.keycloak-secure.entrypoints=websecure"
+      - "traefik.http.routers.keycloak-secure.tls=true"
+      - "traefik.http.routers.keycloak-secure.tls.certresolver=le"
+      - "traefik.http.routers.keycloak-secure.middlewares=keycloak-headers"
+
+      # HTTP router (optional redirect)
       - "traefik.http.routers.keycloak.rule=Host(`auth.osirl.com`)"
       - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.routers.keycloak.middlewares=redirect-to-https"
+
+      # Forward HTTPS headers (Traefik 3.x does NOT do this automatically)
+      - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Port=443"
+      - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Host=auth.osirl.com"
+
+      # Redirect middleware
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+      # Backend service
       - "traefik.http.services.keycloak.loadbalancer.server.scheme=http"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
-      # Healthcheck avoids 502s during startup
-      - "traefik.http.services.keycloak.loadbalancer.healthcheck.path=/realms/master"
-      - "traefik.http.services.keycloak.loadbalancer.healthcheck.interval=5s"
-      - "traefik.http.services.keycloak.loadbalancer.healthcheck.timeout=3s"
 
 
   ###########################################################################
@@ -180,6 +211,14 @@ services:
       - "traefik.http.routers.arc.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
       - "traefik.http.routers.arc.entrypoints=web"
 
+      # HTTPS router for PACS UI
+      - "traefik.http.routers.arc-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
+      - "traefik.http.routers.arc-secure.entrypoints=websecure"
+      - "traefik.http.routers.arc-secure.tls=true"
+      - "traefik.http.routers.arc-secure.tls.certresolver=le"
+      - "traefik.http.services.arc.loadbalancer.server.port=8080"
+
+
       # WildFly internal port
       - "traefik.http.services.arc.loadbalancer.server.port=8080"
 
@@ -206,8 +245,9 @@ services:
       POSTGRES_PASSWORD: pacs
 
       # OIDC endpoints
-      AUTH_SERVER_URL: http://auth.osirl.com
-      UI_AUTH_SERVER_URL: http://auth.osirl.com
+      AUTH_SERVER_URL: https://auth.osirl.com
+      UI_AUTH_SERVER_URL: https://auth.osirl.com
+
 
       # Storage + startup dependencies
       WILDFLY_CHOWN: /storage
