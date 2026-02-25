@@ -225,25 +225,41 @@ services:
       # Middleware to forward Authorization header 
       - "traefik.http.middlewares.pacs-headers.headers.customrequestheaders.Authorization=Authorization"
 
-      # WildFly internal port
-      - "traefik.http.services.arc.loadbalancer.server.port=8080"
+      # - traefik.http.routers.dicomweb.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
+      # - traefik.http.routers.dicomweb.entrypoints=web
+      # - traefik.http.services.dicomweb.loadbalancer.server.port=8080
 
+      # - traefik.http.routers.dicomweb-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
+      # - traefik.http.routers.dicomweb-secure.entrypoints=websecure
+      # - traefik.http.routers.dicomweb-secure.tls=true
+      # - traefik.http.routers.dicomweb-secure.tls.certresolver=le
+      # - traefik.http.services.dicomweb.loadbalancer.server.port=8080
+
+      # - traefik.http.routers.arc.service=arc
+      # - traefik.http.routers.arc-secure.service=arc
+
+      # DICOMweb routers
       - traefik.http.routers.dicomweb.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
       - traefik.http.routers.dicomweb.entrypoints=web
-      - traefik.http.services.dicomweb.loadbalancer.server.port=8080
+      - traefik.http.routers.dicomweb.service=dicomweb
 
       - traefik.http.routers.dicomweb-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
       - traefik.http.routers.dicomweb-secure.entrypoints=websecure
       - traefik.http.routers.dicomweb-secure.tls=true
       - traefik.http.routers.dicomweb-secure.tls.certresolver=le
+      - traefik.http.routers.dicomweb-secure.service=dicomweb
+
+      # DICOMweb service
       - traefik.http.services.dicomweb.loadbalancer.server.port=8080
 
-      - traefik.http.routers.arc.service=arc
-      - traefik.http.routers.arc-secure.service=arc
+      # Phase 2 middlewares
+      - traefik.http.middlewares.dicomweb-strip.stripprefix.prefixes=/dicom-web
+      - traefik.http.middlewares.dicomweb-add.addprefix.prefix=/dcm4chee-arc/aets/DCM4CHEE/rs
 
-      - traefik.http.routers.dicomweb.service=dicomweb
-      - traefik.http.routers.dicomweb-secure.service=dicomweb
-      
+      # Attach middlewares
+      - traefik.http.routers.dicomweb.middlewares=dicomweb-strip,dicomweb-add
+      - traefik.http.routers.dicomweb-secure.middlewares=dicomweb-strip,dicomweb-add
+
 
 
 
