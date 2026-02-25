@@ -222,6 +222,8 @@ services:
       - "traefik.http.routers.arc-secure.tls.certresolver=le"
       - "traefik.http.services.arc.loadbalancer.server.port=8080"
 
+      # Middleware to forward Authorization header 
+      - "traefik.http.middlewares.pacs-headers.headers.customrequestheaders.Authorization=Authorization"
 
       # WildFly internal port
       - "traefik.http.services.arc.loadbalancer.server.port=8080"
@@ -256,6 +258,13 @@ services:
       # Storage + startup dependencies
       WILDFLY_CHOWN: /storage
       WILDFLY_WAIT_FOR: ldap:389 db:5432 keycloak:8080
+
+      WILDFLY_HTTPS_PORT: 8443
+      WILDFLY_HTTPS_KEYSTORE: /opt/wildfly/standalone/configuration/keystores/cacerts.p12
+      WILDFLY_HTTPS_KEYSTORE_PASSWORD: changeit
+
+      DCM4CHEE_ARC_EXTENSIONS: "dcm4chee-arc-ui2,dcm4chee-arc-wado"
+
 
     depends_on:
       - ldap
