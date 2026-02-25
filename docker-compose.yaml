@@ -201,7 +201,7 @@ services:
 
 
   ###########################################################################
-  # DCM4CHEE-ARC — The PACS archive + UI2 (WildFly)
+  # DCM4CHEE-ARC — The PACS archive + UI2 (WildFly) ground zero
   ###########################################################################
   arc:
     image: dcm4che/dcm4chee-arc-psql:5.34.2-secure
@@ -220,13 +220,32 @@ services:
       - "traefik.http.routers.arc-secure.entrypoints=websecure"
       - "traefik.http.routers.arc-secure.tls=true"
       - "traefik.http.routers.arc-secure.tls.certresolver=le"
-      - "traefik.http.services.arc.loadbalancer.server.port=8080"
+      # - "traefik.http.services.arc.loadbalancer.server.port=8080"
 
       # Middleware to forward Authorization header 
       - "traefik.http.middlewares.pacs-headers.headers.customrequestheaders.Authorization=Authorization"
 
       # WildFly internal port
       - "traefik.http.services.arc.loadbalancer.server.port=8080"
+
+      - traefik.http.routers.dicomweb.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
+      - traefik.http.routers.dicomweb.entrypoints=web
+      - traefik.http.services.dicomweb.loadbalancer.server.port=8080
+
+      - traefik.http.routers.dicomweb-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
+      - traefik.http.routers.dicomweb-secure.entrypoints=websecure
+      - traefik.http.routers.dicomweb-secure.tls=true
+      - traefik.http.routers.dicomweb-secure.tls.certresolver=le
+      - traefik.http.services.dicomweb.loadbalancer.server.port=8080
+
+      - traefik.http.routers.arc.service=arc
+      - traefik.http.routers.arc-secure.service=arc
+
+      - traefik.http.routers.dicomweb.service=dicomweb
+      - traefik.http.routers.dicomweb-secure.service=dicomweb
+      
+
+
 
     ports:
       - "8443:8443"     # WildFly HTTPS (internal)
