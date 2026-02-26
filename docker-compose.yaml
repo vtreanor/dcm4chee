@@ -62,27 +62,22 @@ services:
       - proxy
 
     environment:
-      # Database configuration
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://db:5432/pacsdb
-      KC_DB_USERNAME: pacs
-      KC_DB_PASSWORD: pacs
+      KC_DB: postgres 
+      KC_DB_URL: jdbc:postgresql://db:5432/pacsdb 
+      KC_DB_USERNAME: pacs 
+      KC_DB_PASSWORD: pacs 
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin 
+      KC_BOOTSTRAP_ADMIN_PASSWORD: changeit 
+      KC_HOSTNAME: auth.osirl.com 
+      KC_HOSTNAME_URL: https://auth.osirl.com 
+      KC_PROXY_HEADERS: xforwarded 
+      KC_PROXY: edge 
+      KC_HOSTNAME_STRICT: "false" 
+      KC_HOSTNAME_STRICT_HTTPS: "false" 
+      KC_HTTP_ENABLED: "true" 
+      KC_HTTP_PORT: "8080" 
+      KC_HTTPS_ENABLED: "false"
 
-      # Bootstrap admin user
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: changeit
-
-      # Public hostname for OIDC
-      KC_HOSTNAME: auth.osirl.com
-      KC_HOSTNAME_URL: https://auth.osirl.com
-      KC_PROXY_HEADERS: xforwarded
-      KC_PROXY: edge
-      KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
-
-      # HTTP listener (Traefik terminates externally)
-      KC_HTTP_ENABLED: "true"
-      KC_HTTP_PORT: "8080"
 
     labels:
       - "traefik.enable=true"
@@ -201,7 +196,7 @@ services:
 
 
   ###########################################################################
-  # DCM4CHEE-ARC — The PACS archive + UI2 (WildFly) ground zero
+  # DCM4CHEE-ARC — The PACS archive + UI2 (WildFly) ground one
   ###########################################################################
   arc:
     image: dcm4che/dcm4chee-arc-psql:5.34.2-secure
@@ -211,54 +206,54 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Route PACS UI + REST API via Traefik
+      # -----------------------------
+      # PACS UI (arc) Routers
+      # -----------------------------
       - "traefik.http.routers.arc.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
       - "traefik.http.routers.arc.entrypoints=web"
+      - "traefik.http.routers.arc.service=arc"
+      - "traefik.http.routers.arc.priority=1000"
 
-      # HTTPS router for PACS UI
       - "traefik.http.routers.arc-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
       - "traefik.http.routers.arc-secure.entrypoints=websecure"
       - "traefik.http.routers.arc-secure.tls=true"
       - "traefik.http.routers.arc-secure.tls.certresolver=le"
-      # - "traefik.http.services.arc.loadbalancer.server.port=8080"
+      - "traefik.http.routers.arc-secure.service=arc"
+      - "traefik.http.routers.arc-secure.priority=1000"
 
-      # Middleware to forward Authorization header 
+      # UI service
+      - "traefik.http.services.arc.loadbalancer.server.port=8080"
+
+      # -----------------------------
+      # Authorization header passthrough
+      # -----------------------------
       - "traefik.http.middlewares.pacs-headers.headers.customrequestheaders.Authorization=Authorization"
 
-      # - traefik.http.routers.dicomweb.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
-      # - traefik.http.routers.dicomweb.entrypoints=web
-      # - traefik.http.services.dicomweb.loadbalancer.server.port=8080
+      # -----------------------------
+      # DICOMweb Routers
+      # -----------------------------
+      - "traefik.http.routers.dicomweb.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)"
+      - "traefik.http.routers.dicomweb.entrypoints=web"
+      - "traefik.http.routers.dicomweb.service=dicomweb"
+      - "traefik.http.routers.dicomweb.middlewares=dicomweb-strip,dicomweb-add"
+      - "traefik.http.routers.dicomweb.priority=500"
 
-      # - traefik.http.routers.dicomweb-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
-      # - traefik.http.routers.dicomweb-secure.entrypoints=websecure
-      # - traefik.http.routers.dicomweb-secure.tls=true
-      # - traefik.http.routers.dicomweb-secure.tls.certresolver=le
-      # - traefik.http.services.dicomweb.loadbalancer.server.port=8080
-
-      # - traefik.http.routers.arc.service=arc
-      # - traefik.http.routers.arc-secure.service=arc
-
-      # DICOMweb routers
-      - traefik.http.routers.dicomweb.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
-      - traefik.http.routers.dicomweb.entrypoints=web
-      - traefik.http.routers.dicomweb.service=dicomweb
-
-      - traefik.http.routers.dicomweb-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)
-      - traefik.http.routers.dicomweb-secure.entrypoints=websecure
-      - traefik.http.routers.dicomweb-secure.tls=true
-      - traefik.http.routers.dicomweb-secure.tls.certresolver=le
-      - traefik.http.routers.dicomweb-secure.service=dicomweb
+      - "traefik.http.routers.dicomweb-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)"
+      - "traefik.http.routers.dicomweb-secure.entrypoints=websecure"
+      - "traefik.http.routers.dicomweb-secure.tls=true"
+      - "traefik.http.routers.dicomweb-secure.tls.certresolver=le"
+      - "traefik.http.routers.dicomweb-secure.service=dicomweb"
+      - "traefik.http.routers.dicomweb-secure.middlewares=dicomweb-strip,dicomweb-add"
+      - "traefik.http.routers.dicomweb-secure.priority=500"
 
       # DICOMweb service
-      - traefik.http.services.dicomweb.loadbalancer.server.port=8080
+      - "traefik.http.services.dicomweb.loadbalancer.server.port=8080"
 
-      # Phase 2 middlewares
-      - traefik.http.middlewares.dicomweb-strip.stripprefix.prefixes=/dicom-web
-      - traefik.http.middlewares.dicomweb-add.addprefix.prefix=/dcm4chee-arc/aets/DCM4CHEE/rs
-
-      # Attach middlewares
-      - traefik.http.routers.dicomweb.middlewares=dicomweb-strip,dicomweb-add
-      - traefik.http.routers.dicomweb-secure.middlewares=dicomweb-strip,dicomweb-add
+      # -----------------------------
+      # DICOMweb Middlewares
+      # -----------------------------
+      - "traefik.http.middlewares.dicomweb-strip.stripprefix.prefixes=/dicom-web"
+      - "traefik.http.middlewares.dicomweb-add.addprefix.prefix=/dcm4chee-arc/aets/DCM4CHEE/rs"
 
 
 
