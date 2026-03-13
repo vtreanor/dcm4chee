@@ -314,6 +314,7 @@ services:
       - "2762:2762"     # HL7
       - "2575:2575"
       - "12575:12575"
+      - "8082:8080"
 
     environment:
       PROXY_ADDRESS_FORWARDING: "true"
@@ -324,6 +325,8 @@ services:
 
       WADO_BASE_URL: https://pacs-ui.osirl.com/dcm4chee-arc/aets/DCM4CHEE/rs
 
+      QIDO_BASE_URL: https://pacs-ui.osirl.com
+      QIDO_BASE_PATH: /dcm4chee-arc/aets/DCM4CHEE/rs
 
       # Logging
       WILDFLY_LOGLEVEL: INFO
