@@ -209,6 +209,8 @@ services:
     volumes:
       - /var/local/dcm4chee-arc/ldap:/var/lib/openldap/openldap-data
       - /var/local/dcm4chee-arc/slapd.d:/etc/openldap/slapd.d
+      - pacs_ldap-config:/etc/openldap/slapd.d
+      - pacs_ldap-data:/var/lib/openldap/openldap-data
 
 
   ###########################################################################
@@ -282,6 +284,7 @@ services:
       - "traefik.http.routers.dicomweb.priority=500"
 
       - "traefik.http.routers.arc-secure.middlewares=forward-headers"
+
       - "traefik.http.routers.dicomweb-secure.middlewares=dicomweb-strip,dicomweb-add,forward-headers"
 
 
@@ -312,15 +315,18 @@ services:
       - "9993:9993"
       - "11112:11112"   # DICOM C-STORE SCP
       - "2762:2762"     # HL7
-      - "2575:2575"
+      # - "2575:2575"
       - "12575:12575"
       - "8082:8080"
 
     environment:
       PROXY_ADDRESS_FORWARDING: "true"
+      HTTP_PROXY_ADDRESS_FORWARDING: "true"
       ARCHIVE_DEVICE_HTTPS_SCHEME: https
       ARCHIVE_DEVICE_HTTPS_HOST: pacs-ui.osirl.com
+      # ARCHIVE_DEVICE_HTTPS_HOST: 0.0.0.0
       ARCHIVE_DEVICE_HTTPS_PORT: 443
+      ARCHIVE_DEVICE_HTTP_PORT: 80
       ARCHIVE_DEVICE_WADO_URL: "https://pacs-ui.osirl.com/dcm4chee-arc/aets/DCM4CHEE/rs"
 
       WADO_BASE_URL: https://pacs-ui.osirl.com/dcm4chee-arc/aets/DCM4CHEE/rs
@@ -368,7 +374,8 @@ services:
       - /var/local/dcm4chee-arc/storage:/storage
 
       # Optional override (not needed now that OIDC is correct)
-      - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2.war/ui2/keycloak.json
+      # - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2.war/ui2/keycloak.json
+      - ./keycloak.json:/opt/wildfly/standalone/configuration/keycloak.json:ro
 
 
   ###########################################################################
@@ -391,3 +398,7 @@ services:
 networks:
   proxy:
     name: proxy
+
+volumes:
+  pacs_ldap-config:
+  pacs_ldap-data:
