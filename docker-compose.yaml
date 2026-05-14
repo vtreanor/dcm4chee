@@ -110,7 +110,7 @@ services:
       KC_DB_USERNAME: pacs 
       KC_DB_PASSWORD: pacs 
       KC_BOOTSTRAP_ADMIN_USERNAME: admin 
-      KC_BOOTSTRAP_ADMIN_PASSWORD: changeit 
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin 
       KC_HOSTNAME: auth.techirl.eu 
       KC_HOSTNAME_URL: https://auth.techirl.eu 
       KC_PROXY_HEADERS: xforwarded 
@@ -122,9 +122,56 @@ services:
       KC_HTTPS_ENABLED: "false"
 
 
+
+    # environment:
+    #   KC_DB: postgres 
+    #   KC_DB_URL: jdbc:postgresql://db:5432/pacsdb 
+    #   KC_DB_USERNAME: pacs 
+    #   KC_DB_PASSWORD: pacs 
+    #   KC_BOOTSTRAP_ADMIN_USERNAME: admin 
+    #   KC_BOOTSTRAP_ADMIN_PASSWORD: admin 
+      
+    #   # The core hostname settings
+    #   PROXY_ADDRESS_FORWARDING: "true"
+    #   KC_HOSTNAME: auth.techirl.eu
+    #   # KC_PROXY: edge
+    #   KC_HTTP_ENABLED: "true"
+    #   KC_HOSTNAME_STRICT: "false"
+    #   KC_HOSTNAME_STRICT_HTTPS: "false"
+    #   KC_HOSTNAME_URL: https://auth.techirl.eu
+
+      # Use this to force the generated links to HTTPS
+      # KC_HOSTNAME_URL: https://auth.techirl.eu
+      # KC_HOSTNAME_ADMIN_URL: https://auth.techirl.eu
+      
+      # Remove KC_HOSTNAME_URL and the redundant PROXY_ADDRESS_FORWARDING
+      # (KC_PROXY: edge handles the headers correctly)
+
+
+    # environment:
+    #   KC_DB: postgres 
+    #   KC_DB_URL: jdbc:postgresql://db:5432/pacsdb 
+    #   KC_DB_USERNAME: pacs 
+    #   KC_DB_PASSWORD: pacs 
+    #   KC_BOOTSTRAP_ADMIN_USERNAME: admin 
+    #   KC_BOOTSTRAP_ADMIN_PASSWORD: changeit       
+    #   KC_HOSTNAME_URL: https://auth.techirl.eu 
+      
+    #   KC_PROXY: edge 
+    #    
+    #   KC_HTTP_ENABLED: "true" 
+    #   # KC_HTTP_PORT: "8080" 
+    #   KC_HTTPS_ENABLED: "false"      
+    #   KC_HTTPS_PORT: 443    
+
+    #   KC_PROXY_HEADERS: xforwarded 
+    #   # KEYCLOAK_FRONTEND_URL: https://auth.techirl.eu
+    #   KC_HOSTNAME: auth.techirl.eu
+    #   KC_HOSTNAME_STRICT: false
+    #   PROXY_ADDRESS_FORWARDING: true
+
     labels:
       - "traefik.enable=true"
-
       # HTTPS router
       - "traefik.http.routers.keycloak-secure.rule=Host(`auth.techirl.eu`)"
       - "traefik.http.routers.keycloak-secure.entrypoints=websecure"
@@ -132,22 +179,47 @@ services:
       - "traefik.http.routers.keycloak-secure.tls.certresolver=le"
       - "traefik.http.routers.keycloak-secure.middlewares=keycloak-headers"
 
-      # HTTP router (optional redirect)
+      # HTTP router
       - "traefik.http.routers.keycloak.rule=Host(`auth.techirl.eu`)"
       - "traefik.http.routers.keycloak.entrypoints=web"
       - "traefik.http.routers.keycloak.middlewares=redirect-to-https"
 
-      # Forward HTTPS headers (Traefik 3.x does NOT do this automatically)
+      # Middleware: The "X-Forwarded" engine
       - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Port=443"
       - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Host=auth.techirl.eu"
 
-      # Redirect middleware
+      # Redirect and Backend
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-
-      # Backend service
       - "traefik.http.services.keycloak.loadbalancer.server.scheme=http"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+
+    # labels:
+    #   - "traefik.enable=true"
+
+    #   # HTTPS router
+    #   - "traefik.http.routers.keycloak-secure.rule=Host(`auth.techirl.eu`)"
+    #   - "traefik.http.routers.keycloak-secure.entrypoints=websecure"
+    #   - "traefik.http.routers.keycloak-secure.tls=true"
+    #   - "traefik.http.routers.keycloak-secure.tls.certresolver=le"
+    #   - "traefik.http.routers.keycloak-secure.middlewares=keycloak-headers"
+
+    #   # HTTP router (optional redirect)
+    #   - "traefik.http.routers.keycloak.rule=Host(`auth.techirl.eu`)"
+    #   - "traefik.http.routers.keycloak.entrypoints=web"
+    #   - "traefik.http.routers.keycloak.middlewares=redirect-to-https"
+
+    #   # Forward HTTPS headers (Traefik 3.x does NOT do this automatically)
+    #   - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+    #   # - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Port=443"
+    #   # - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Host=auth.techirl.eu"
+
+    #   # Redirect middleware
+    #   - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+    #   # Backend service
+    #   - "traefik.http.services.keycloak.loadbalancer.server.scheme=http"
+    #   - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
 
 
@@ -248,9 +320,9 @@ services:
     networks:
       - proxy
     
-    extra_hosts:
-      - "auth.techirl.eu:172.18.0.7"
-      - "pacs-ui.techirl.eu:172.18.0.7"
+    # extra_hosts:
+    #   - "auth.techirl.eu:172.18.0.7"
+    #   - "pacs-ui.techirl.eu:172.18.0.7"
     
     labels:
       - "traefik.enable=true"
@@ -258,10 +330,10 @@ services:
       # -----------------------------
       # PACS UI (arc) Routers
       # -----------------------------
-      # - "traefik.http.routers.arc.rule=Host(`pacs-ui.techirl.eu`) && PathPrefix(`/dcm4chee-arc`)"
+      - "traefik.http.routers.arc.rule=Host(`pacs-ui.techirl.eu`) && PathPrefix(`/dcm4chee-arc`)"
       # - "traefik.http.routers.arc.entrypoints=web"
-      - "traefik.http.routers.arc.service=arc"
-      - "traefik.http.routers.arc.priority=1000"
+      # - "traefik.http.routers.arc.service=arc"
+      # - "traefik.http.routers.arc.priority=1000"
 
       - "traefik.http.routers.arc-secure.rule=Host(`pacs-ui.techirl.eu`) && PathPrefix(`/dcm4chee-arc`)"
       - "traefik.http.routers.arc-secure.entrypoints=websecure"
@@ -310,6 +382,9 @@ services:
       - "traefik.http.middlewares.dicomweb-add.addprefix.prefix=/dcm4chee-arc/aets/DCM4CHEE/rs"
 
       - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Host=pacs-ui.techirl.eu"
+      - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Port=443"
+
 
 
 
@@ -324,8 +399,8 @@ services:
       - "8082:8080"
 
     environment:
-      PROXY_ADDRESS_FORWARDING: "true"
-      HTTP_PROXY_ADDRESS_FORWARDING: "true"
+      
+      
       ARCHIVE_DEVICE_HTTPS_SCHEME: https
       ARCHIVE_DEVICE_HTTPS_HOST: pacs-ui.techirl.eu
       # ARCHIVE_DEVICE_HTTPS_HOST: 0.0.0.0
@@ -351,9 +426,26 @@ services:
       POSTGRES_PASSWORD: pacs
 
       # OIDC endpoints
+      # AUTH_SERVER_URL: https://auth.techirl.eu
+      # UI_AUTH_SERVER_URL: https://auth.techirl.eu
+      # AUTH_SERVER_URL: http://pacs-keycloak-1:8080
+      # UI_AUTH_SERVER_URL: http://pacs-keycloak-1:8080
+      # AUTH_SERVER_URL: http://pacs-keycloak-1
+      # UI_AUTH_SERVER_URL: http://pacs-keycloak-1
+      # AUTH_SERVER_URL: http://172.18.0.8:8080
+      # UI_AUTH_SERVER_URL: http://172.18.0.8:8080
+      # AUTH_SERVER_URL: http://pacs-keycloak-1:8080
+      # UI_AUTH_SERVER_URL: https://auth.techirl.eu
+      # AUTH_SERVER_URL: http://pacs-keycloak-1:8080
+      # UI_AUTH_SERVER_URL: http://pacs-keycloak-1:8080
+      # AUTH_SERVER_URL: http://pacs-keycloak-1:8080
+      LDAP_UPDATE_CONFIG: true
+      # AUTH_SERVER_URL: http://keycloak:8080
       AUTH_SERVER_URL: https://auth.techirl.eu
       UI_AUTH_SERVER_URL: https://auth.techirl.eu
-
+      KC_REALM: dcm4che
+      PROXY_ADDRESS_FORWARDING: "true"
+      HTTP_PROXY_ADDRESS_FORWARDING: "true"
 
       # Storage + startup dependencies
       WILDFLY_CHOWN: /storage
@@ -374,14 +466,16 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - /var/local/dcm4chee-arc/wildfly:/opt/wildfly/standalone
+      # - /var/local/dcm4chee-arc/wildfly:/opt/wildfly/standalone
       - /var/local/dcm4chee-arc/storage:/storage
+      - arc_data:/data
+      - ./keycloak.json:/opt/wildfly/standalone/configuration/dcm4chee-arc/keycloak.json:ro
 
       # Map the host 'resources' folder to the container's internal 'resources' folder
       # - /var/local/dcm4chee-arc/ui/resources:/opt/wildfly/standalone/configuration/dcm4chee-arc/ui2/resources
       # - /var/local/dcm4chee-arc/ui/configuration:/opt/wildfly/standalone/configuration/dcm4chee-arc/ui2/configuration:ro
-      - /var/local/dcm4chee-arc/wildfly/configuration/dcm4chee-arc/ui2/resources/css/style.css:/opt/wildfly/welcome-content/dcm4chee-arc/ui2/resources/css/style.css
-      - /var/local/dcm4chee-arc/wildfly/configuration/dcm4chee-arc/ui2/resources/img/bg.jpg:/opt/wildfly/welcome-content/dcm4chee-arc/ui2/resources/img/bg.jpg
+      # - /var/local/dcm4chee-arc/wildfly/configuration/dcm4chee-arc/ui2/resources/css/style.css:/opt/wildfly/welcome-content/dcm4chee-arc/ui2/resources/css/style.css
+      # - /var/local/dcm4chee-arc/wildfly/configuration/dcm4chee-arc/ui2/resources/img/bg.jpg:/opt/wildfly/welcome-content/dcm4chee-arc/ui2/resources/img/bg.jpg
 
       # Optional override (not needed now that OIDC is correct)
       # - ./keycloak.json:/opt/wildfly/standalone/deployments/dcm4chee-arc-ui2.war/ui2/keycloak.json
@@ -459,3 +553,4 @@ networks:
 volumes:
   pacs_ldap-config:
   pacs_ldap-data:
+  arc_data:

@@ -1,2 +1,25 @@
 Viewers/
 .git-credentials
+.env
+/home/ubuntu/pacs/.pomerium-config/config.yaml
+
+# Temporary and Backup files
+*.$$$
+letsencrypt$$$/
+*.txt
+hosts
+
+# Secrets and Configs (Crucial for security)
+.env
+letsencrypt/acme.json
+cookies.txt
+
+# Local/Temporary JSON files
+client*.json
+stuff.json
+keycloak.json
+
+# Tool-specific folders
+pomerium/
+pomerium-config.yaml
+config.yaml
