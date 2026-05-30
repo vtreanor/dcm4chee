@@ -6,22 +6,31 @@
 #   [FIX-2]  arc: UI_AUTH_SERVER_URL added (was absent in OVH)
 #   [FIX-3]  arc: forward-headers middleware includes all three X-Forwarded headers
 #   [FIX-4]  arc: CSS/image bind-mounts removed (fail if host files absent)
-#   [FIX-5]  arc: arc_data named volume added (present in AWS, absent in OVH)
+#   [FIX-5]  arc: arc_data named volume replaced with bind-mount
 #   [FIX-6]  arc: LDAP_UPDATE_CONFIG added
 #   [FIX-7]  traefik: logging stanza added
 #   [FIX-8]  whoami: unresolved ${whoami_ip} replaced with proper hostname
-#   [FIX-9]  ldap: bind-mount / named-volume path conflict resolved
-#   [FIX-10] arc: AUTH_SERVER_URL uses public https:// URL; arc resolves it directly
-#             to Keycloak container via extra_hosts (no Traefik, no TLS, no hairpin)
-#             for browser redirects. This is the correct pattern for edge-proxied KC.
-#   [FIX-11] arc: extra_hosts — auth.techirl.eu → Keycloak container (172.22.0.3)
-
-#             trying to hairpin through the public IP (145.239.3.120) which times out.
-#             Adjust the IP if `docker network inspect proxy | grep Gateway` differs.
-#   [FIX-12] keycloak: KC_HOSTNAME_STRICT set to "true" and KC_HOSTNAME_ADMIN_URL
-#             added so Keycloak builds all OIDC discovery endpoints with the correct
-#             https:// public URL rather than http://auth.techirl.eu:8080/...
-#             This was why the discovery document had wrong issuer/endpoint URLs.
+#   [FIX-9]  ldap: bind-mount / named-volume path conflict resolved; now all
+#             bind-mounts under /var/local/dcm4chee-arc/
+#   [FIX-10] arc: AUTH_SERVER_URL uses http://keycloak:8080 (internal DNS);
+#             KC_HOSTNAME_BACKCHANNEL_DYNAMIC ensures discovery doc still
+#             returns https:// URLs for browser redirects
+#   [FIX-11] arc: extra_hosts — pacs-ui.techirl.eu → Docker gateway (172.22.0.1)
+#             for WADO/QIDO self-references without hairpin NAT
+#   [FIX-12] keycloak: KC_HOSTNAME as full https:// URL with KC_HOSTNAME_STRICT
+#             and KC_HOSTNAME_BACKCHANNEL_DYNAMIC for correct KC 26 behaviour
+#   [FIX-13] volumes: all named volumes converted to bind-mounts under
+#             /var/local/dcm4chee-arc/ — eliminates orphan volume accumulation,
+#             improves backup visibility, removes anonymous volume risk
+#
+# All persistent data lives under /var/local/dcm4chee-arc/:
+#   db/          — PostgreSQL data
+#   ldap/        — OpenLDAP data
+#   slapd.d/     — OpenLDAP config
+#   arc-data/    — dcm4chee-arc internal data
+#   storage/     — DICOM study storage
+#   mysql/       — MariaDB data (unused but kept)
+#   re-brand/    — Optional UI branding overrides
 #############################################################################
 
 services:
@@ -136,11 +145,7 @@ services:
         max-size: "50m"
         max-file: "5"
 
-    volumes:
-      - ./realm-export-fixed.json:/opt/keycloak/data/import/realm-export.json:ro
-
     environment:
-      KC_IMPORT: /opt/keycloak/data/import/realm-export.json
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://db:5432/pacsdb
       KC_DB_USERNAME: pacs
@@ -148,17 +153,11 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
 
-      # [FIX-12] Keycloak 26 hostname configuration.
-      #
-      # KC_HOSTNAME sets the public hostname Keycloak uses in ALL URLs it generates
-      # (issuer, endpoints, redirects) regardless of how it was accessed. In KC 26
-      # this replaces the old KC_HOSTNAME_URL approach.
-      #
-      # KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true" is the key setting — it tells KC 26
-      # to serve https:// frontend URLs (for browsers) while also correctly handling
-      # backchannel (server-to-server) requests that arrive on plain HTTP. Without
-      # this, KC ignores KC_HOSTNAME when queried directly on http://keycloak:8080
-      # and falls back to the raw listener URL (http://auth.techirl.eu:8080).
+      # [FIX-12] KC 26 hostname config.
+      # KC_HOSTNAME must be a full https:// URL when KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+      # is true. KC_HOSTNAME_BACKCHANNEL_DYNAMIC allows KC to serve correct https://
+      # discovery endpoints even when queried directly on http://keycloak:8080
+      # (no X-Forwarded-Proto header), which is how arc reaches it internally.
       KC_HOSTNAME: https://auth.techirl.eu
       KC_HOSTNAME_STRICT: "true"
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
@@ -169,6 +168,12 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: "8080"
       KC_HTTPS_ENABLED: "false"
+
+      # Auto-import realm on fresh deploy (no-op if realm already exists in DB)
+      KC_IMPORT: /opt/keycloak/data/import/realm-export.json
+
+    volumes:
+      - ./realm-export-fixed.json:/opt/keycloak/data/import/realm-export.json:ro
 
     labels:
       - "traefik.enable=true"
@@ -247,14 +252,12 @@ services:
       - "traefik.tcp.routers.ldap.entrypoints=ldap"
       - "traefik.tcp.services.ldap.loadbalancer.server.port=389"
 
-    # [FIX-9] Named volumes only — bind-mounts and named volumes were competing
-    # for the same container paths. Re-enable bind-mounts below only if direct
-    # host filesystem access to LDAP data is needed.
+    # [FIX-9, FIX-13] All bind-mounts — no named volumes, no conflicts, no orphans.
     volumes:
-      # - /var/local/dcm4chee-arc/ldap:/var/lib/openldap/openldap-data
-      # - /var/local/dcm4chee-arc/slapd.d:/etc/openldap/slapd.d
-      - pacs_ldap-config:/etc/openldap/slapd.d
-      - pacs_ldap-data:/var/lib/openldap/openldap-data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/local/dcm4chee-arc/ldap:/var/lib/openldap/openldap-data
+      - /var/local/dcm4chee-arc/slapd.d:/etc/openldap/slapd.d
 
 
   ###########################################################################
@@ -298,10 +301,10 @@ services:
         max-size: "50m"
         max-file: "5"
 
-    # [FIX-11] pacs-ui.techirl.eu pointed at Docker gateway so arc's internal
-    # WADO/QIDO self-references resolve without hairpinning through the public IP.
-    # auth.techirl.eu is NOT overridden here — arc reaches Keycloak via the
-    # http://keycloak:8080 service name in AUTH_SERVER_URL instead (no IP needed).
+    # [FIX-11] OVH bare-metal does not support hairpin NAT. pacs-ui.techirl.eu
+    # is pointed at the Docker gateway so arc's internal WADO/QIDO self-references
+    # route through Traefik without attempting to reach the public NIC.
+    # Verify gateway: docker network inspect proxy | grep Gateway
     extra_hosts:
       - "pacs-ui.techirl.eu:172.22.0.1"
 
@@ -375,7 +378,7 @@ services:
       QIDO_BASE_URL: https://pacs-ui.techirl.eu
       QIDO_BASE_PATH: /dcm4chee-arc/aets/DCM4CHEE/rs
 
-      # Logging
+      # Logging — reduce to INFO across the board once stable
       WILDFLY_LOGLEVEL: INFO
       WILDFLY_LOGLEVEL_ORG_KEYCLOAK: DEBUG
       WILDFLY_LOGLEVEL_ORG_DCM4CHE: DEBUG
@@ -387,16 +390,11 @@ services:
       POSTGRES_USER: pacs
       POSTGRES_PASSWORD: pacs
 
-      # [FIX-10] arc uses http://keycloak:8080 for server-side OIDC calls
-      # (token introspection, JWKS). This resolves via Docker internal DNS —
-      # no IP hardcoding, no hairpin NAT, no TLS trust issues.
-      #
-      # KC_HOSTNAME_BACKCHANNEL_DYNAMIC in Keycloak ensures that even when
-      # queried on http://keycloak:8080, the discovery document returns
-      # https://auth.techirl.eu in all endpoint URLs, so the browser redirect
-      # arc generates points at the correct public HTTPS address.
-      #
-      # UI_AUTH_SERVER_URL is the public URL the browser uses for login redirect.
+      # [FIX-10] AUTH_SERVER_URL uses Docker internal DNS — resolves to keycloak
+      # container directly, no hairpin NAT, no TLS trust issues.
+      # KC_HOSTNAME_BACKCHANNEL_DYNAMIC (on Keycloak) ensures the discovery doc
+      # returned via this path still contains correct https:// public URLs,
+      # so the browser login redirect goes to https://auth.techirl.eu as expected.
       AUTH_SERVER_URL: http://keycloak:8080
       UI_AUTH_SERVER_URL: https://auth.techirl.eu
 
@@ -421,16 +419,16 @@ services:
       - keycloak
       - db
 
+    # [FIX-13] arc_data named volume replaced with bind-mount — visible on host
+    # filesystem, trivially backed up, never becomes an orphan.
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - /var/local/dcm4chee-arc/storage:/storage
-      - arc_data:/data
+      - /var/local/dcm4chee-arc/arc-data:/data
       - /var/local/dcm4chee-arc/re-brand:/opt/wildfly/re-brand:ro
 
-      # [FIX-4] CSS/image bind-mounts removed — cause hard startup failure if
-      # host files don't exist. Re-add once paths are confirmed present:
-      #
+      # Optional branding overrides — uncomment once host files are in place:
       # - /var/local/dcm4chee-arc/wildfly/configuration/dcm4chee-arc/ui2/resources/css/style.css:/opt/wildfly/welcome-content/dcm4chee-arc/ui2/resources/css/style.css
       # - /var/local/dcm4chee-arc/wildfly/configuration/dcm4chee-arc/ui2/resources/img/bg.jpg:/opt/wildfly/welcome-content/dcm4chee-arc/ui2/resources/img/bg.jpg
 
@@ -454,7 +452,7 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # [FIX-8] Replaced unresolved ${whoami_ip} env-var with proper hostname
+      # [FIX-8] Replaced unresolved ${whoami_ip} with proper hostname
       - "traefik.http.routers.whoami.rule=Host(`whoami.techirl.eu`)"
       - "traefik.http.routers.whoami.entrypoints=web"
 
@@ -473,10 +471,5 @@ networks:
   proxy:
     name: proxy
 
-###########################################################################
-# VOLUMES
-###########################################################################
-volumes:
-  pacs_ldap-config:
-  pacs_ldap-data:
-  arc_data:
+# No named volumes — all data is on the host under /var/local/dcm4chee-arc/
+# This eliminates orphan volume accumulation entirely.
