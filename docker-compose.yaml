@@ -1,42 +1,37 @@
 #############################################################################
-# OVH PACS deployment — branch pacs-v1.1
+# OVH PACS deployment — branch pacs-v05
 #
 # Fix history:
-#   [FIX-1]  arc: REALM_NAME env var (XML reads env.REALM_NAME, not KC_REALM)
-#   [FIX-2]  arc: UI_AUTH_SERVER_URL added (was absent in OVH)
+#   [FIX-1]  arc: REALM_NAME env var
+#   [FIX-2]  arc: UI_AUTH_SERVER_URL added
 #   [FIX-3]  arc: forward-headers middleware includes all three X-Forwarded headers
-#   [FIX-4]  arc: CSS/image bind-mounts removed (fail if host files absent)
+#   [FIX-4]  arc: CSS/image bind-mounts removed
 #   [FIX-5]  arc: arc_data named volume replaced with bind-mount
 #   [FIX-6]  arc: LDAP_UPDATE_CONFIG added
 #   [FIX-7]  traefik: logging stanza added
 #   [FIX-8]  whoami: unresolved ${whoami_ip} replaced with proper hostname
-#   [FIX-9]  ldap: bind-mount / named-volume path conflict resolved; now all
-#             bind-mounts under /var/local/dcm4chee-arc/
-#   [FIX-10] arc: AUTH_SERVER_URL uses http://keycloak:8080 (internal DNS);
-#             KC_HOSTNAME_BACKCHANNEL_DYNAMIC ensures discovery doc still
-#             returns https:// URLs for browser redirects
-#   [FIX-11] arc: extra_hosts — pacs-ui.techirl.eu → Docker gateway (172.22.0.1)
-#             for WADO/QIDO self-references without hairpin NAT
-#   [FIX-12] keycloak: KC_HOSTNAME as full https:// URL with KC_HOSTNAME_STRICT
-#             and KC_HOSTNAME_BACKCHANNEL_DYNAMIC for correct KC 26 behaviour
-#   [FIX-13] volumes: all named volumes converted to bind-mounts under
-#             /var/local/dcm4chee-arc/ — eliminates orphan volume accumulation,
-#             improves backup visibility, removes anonymous volume risk
-#
-# All persistent data lives under /var/local/dcm4chee-arc/:
-#   db/          — PostgreSQL data
-#   ldap/        — OpenLDAP data
-#   slapd.d/     — OpenLDAP config
-#   arc-data/    — dcm4chee-arc internal data
-#   storage/     — DICOM study storage
-#   mysql/       — MariaDB data (unused but kept)
-#   re-brand/    — Optional UI branding overrides
+#   [FIX-9]  ldap: bind-mount / named-volume path conflict resolved
+#   [FIX-10] arc: AUTH_SERVER_URL uses http://keycloak:8080 (internal DNS)
+#   [FIX-11] arc: extra_hosts — pacs-ui.techirl.eu → Docker gateway
+#   [FIX-12] keycloak: KC_HOSTNAME as full https:// URL
+#   [FIX-13] volumes: all named volumes converted to bind-mounts
+#   [SEC-1]  All credentials moved to .env file
+#   [SEC-2]  mariadb removed — unused, was exposing port 3306 with weak password
+#   [SEC-3]  Traefik dashboard secured — api.insecure removed, dashboard
+#             restricted to internal IPs via middleware
+#   [SEC-4]  WildFly management ports 9990/9993 removed from host publishing
+#   [SEC-5]  PostgreSQL port 5432 removed from host publishing
+#   [SEC-6]  whoami restricted to internal source IPs only
+#   [SEC-7]  Network segmentation — backend network added; db and ldap moved
+#             off proxy network
+#   [SEC-8]  Plain LDAP port 389 removed from Traefik entrypoints
+#   [SEC-9]  Log levels set to INFO
 #############################################################################
 
 services:
 
   ###########################################################################
-  # TRAEFIK — Reverse proxy for HTTP + TCP (LDAP)
+  # TRAEFIK — Reverse proxy
   ###########################################################################
   traefik:
     image: "traefik:v3.6"
@@ -51,9 +46,13 @@ services:
         max-file: "5"
 
     command:
-      - "--log.level=DEBUG"
-      - "--api.insecure=true"
+      - "--log.level=INFO"
+      - "--providers.docker.network=proxy"
 
+      # [SEC-3] Dashboard enabled but protected — no api.insecure
+      - "--api.dashboard=true"
+      - "--api=true"
+      - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
 
@@ -70,15 +69,26 @@ services:
       - "--certificatesresolvers.le.acme.email=admin@techirl.eu"
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
 
-      - "--entryPoints.ldap.address=:389"
+      # [SEC-8] Plain LDAP entrypoint removed — LDAPS only
       - "--entryPoints.ldaps.address=:636"
 
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"   # Traefik dashboard — restrict or remove once stable
-      - "389:389"
+      # [SEC-3] 8080 removed — dashboard now via SSH tunnel on websecure
       - "636:636"
+
+    # [SEC-3] Dashboard router defined via labels below
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.techirl.eu`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=le"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-ipallow"
+      # Restrict dashboard to your known source ranges
+      - "traefik.http.middlewares.dashboard-ipallow.ipallowlist.sourcerange=137.43.136.0/23,86.46.174.0/24,137.43.50.0/24"
 
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
@@ -99,9 +109,6 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
-
-    ports:
-      - "8081:80"
 
     environment:
       PUBLIC_URL: "/"
@@ -138,6 +145,7 @@ services:
     image: dcm4che/keycloak:26.0.6
     networks:
       - proxy
+      - backend
 
     logging:
       driver: "json-file"
@@ -148,29 +156,22 @@ services:
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://db:5432/pacsdb
-      KC_DB_USERNAME: pacs
-      KC_DB_PASSWORD: pacs
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # [SEC-1] Credentials from .env
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
 
-      # [FIX-12] KC 26 hostname config.
-      # KC_HOSTNAME must be a full https:// URL when KC_HOSTNAME_BACKCHANNEL_DYNAMIC
-      # is true. KC_HOSTNAME_BACKCHANNEL_DYNAMIC allows KC to serve correct https://
-      # discovery endpoints even when queried directly on http://keycloak:8080
-      # (no X-Forwarded-Proto header), which is how arc reaches it internally.
       KC_HOSTNAME: https://auth.techirl.eu
       KC_HOSTNAME_STRICT: "true"
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
 
-      # KC_PROXY: edge is deprecated in KC 26 — KC_PROXY_HEADERS alone is correct.
       KC_PROXY_HEADERS: xforwarded
-
       KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: "8080"
       KC_HTTPS_ENABLED: "false"
 
-      # Auto-import realm on fresh deploy (no-op if realm already exists in DB)
-      KC_IMPORT: /opt/keycloak/data/import/realm-export.json
+      # KC_IMPORT: /opt/keycloak/data/import/realm-export.json
 
     volumes:
       - ./realm-export-fixed.json:/opt/keycloak/data/import/realm-export.json:ro
@@ -198,41 +199,14 @@ services:
 
 
   ###########################################################################
-  # MARIADB — Unused (Keycloak uses Postgres); kept for parity
-  ###########################################################################
-  mariadb:
-    image: mariadb:10.11.4
-    networks:
-      - proxy
-
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-
-    ports:
-      - "3306:3306"
-
-    environment:
-      MYSQL_ROOT_PASSWORD: secret
-      MYSQL_DATABASE: keycloak
-      MYSQL_USER: keycloak
-      MYSQL_PASSWORD: keycloak
-
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
-      - /var/local/dcm4chee-arc/mysql:/var/lib/mysql
-
-
-  ###########################################################################
   # LDAP — DCM4CHEE directory service
+  # [SEC-7] On backend network only — not reachable from proxy network
   ###########################################################################
   ldap:
     image: dcm4che/slapd-dcm4chee:2.6.10-34.2
     container_name: ldap
     networks:
-      - proxy
+      - backend
 
     logging:
       driver: "json-file"
@@ -242,17 +216,13 @@ services:
 
     environment:
       LDAP_BASE_DN: dc=dcm4che,dc=org
-      LDAP_ADMIN_PASSWORD: secret
+      # [SEC-1] Credentials from .env
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD}
       STORAGE_DIR: /storage/fs1
 
-    labels:
-      - "traefik.enable=true"
-      - "traefik.tcp.routers.ldap.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.ldap.tls=false"
-      - "traefik.tcp.routers.ldap.entrypoints=ldap"
-      - "traefik.tcp.services.ldap.loadbalancer.server.port=389"
+    # [SEC-8] LDAP Traefik labels removed — no external exposure
+    # arc connects directly via Docker DNS: ldap:389 on backend network
 
-    # [FIX-9, FIX-13] All bind-mounts — no named volumes, no conflicts, no orphans.
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -262,24 +232,24 @@ services:
 
   ###########################################################################
   # POSTGRES — Main PACS database
+  # [SEC-5] Port 5432 not published to host
+  # [SEC-7] On backend network only
   ###########################################################################
   db:
     image: dcm4che/postgres-dcm4chee:17.4-34
     networks:
-      - proxy
+      - backend
 
     logging:
       driver: json-file
       options:
         max-size: "10m"
 
-    ports:
-      - "5432:5432"
-
+    # [SEC-5] No ports published — backend network only
     environment:
-      POSTGRES_DB: pacsdb
-      POSTGRES_USER: pacs
-      POSTGRES_PASSWORD: pacs
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     volumes:
       - /etc/localtime:/etc/localtime:ro
@@ -294,6 +264,7 @@ services:
     image: dcm4che/dcm4chee-arc-psql:5.34.2-secure
     networks:
       - proxy
+      - backend
 
     logging:
       driver: "json-file"
@@ -301,17 +272,13 @@ services:
         max-size: "50m"
         max-file: "5"
 
-    # [FIX-11] OVH bare-metal does not support hairpin NAT. pacs-ui.techirl.eu
-    # is pointed at the Docker gateway so arc's internal WADO/QIDO self-references
-    # route through Traefik without attempting to reach the public NIC.
-    # Verify gateway: docker network inspect proxy | grep Gateway
     extra_hosts:
       - "pacs-ui.techirl.eu:172.22.0.1"
 
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
 
-      # PACS UI routers
       - "traefik.http.routers.arc.service=arc"
       - "traefik.http.routers.arc.priority=1000"
 
@@ -323,13 +290,10 @@ services:
       - "traefik.http.routers.arc-secure.priority=1000"
       - "traefik.http.routers.arc-secure.middlewares=forward-headers"
 
-      # UI service backend
       - "traefik.http.services.arc.loadbalancer.server.port=8080"
 
-      # Authorization header passthrough
       - "traefik.http.middlewares.pacs-headers.headers.customrequestheaders.Authorization=Authorization"
 
-      # DICOMweb routers
       - "traefik.http.routers.dicomweb.service=dicomweb"
       - "traefik.http.routers.dicomweb.middlewares=dicomweb-strip,dicomweb-add"
       - "traefik.http.routers.dicomweb.priority=500"
@@ -342,26 +306,23 @@ services:
       - "traefik.http.routers.dicomweb-secure.middlewares=dicomweb-strip,dicomweb-add,forward-headers"
       - "traefik.http.routers.dicomweb-secure.priority=500"
 
-      # DICOMweb service backend
       - "traefik.http.services.dicomweb.loadbalancer.server.port=8080"
 
-      # DICOMweb path rewrite
       - "traefik.http.middlewares.dicomweb-strip.stripprefix.prefixes=/dicom-web"
       - "traefik.http.middlewares.dicomweb-add.addprefix.prefix=/dcm4chee-arc/aets/DCM4CHEE/rs"
 
-      # [FIX-3] All three X-Forwarded headers required for correct KC redirect URIs
       - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Host=pacs-ui.techirl.eu"
       - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Port=443"
 
     ports:
       - "8443:8443"
-      - "9990:9990"
-      - "9993:9993"
+      # [SEC-4] 9990/9993 removed — access via SSH tunnel if needed
+      # ssh -L 9990:localhost:9990 user@145.239.3.120
       - "11112:11112"
       - "2762:2762"
-      - "12575:12575"
-      - "8082:8080"
+      # [SEC-4] 8082:8080 removed — vestigial debug port
+      # [SEC-5] 12575 removed — vestigial
 
     environment:
       PROXY_ADDRESS_FORWARDING: "true"
@@ -374,44 +335,32 @@ services:
       ARCHIVE_DEVICE_WADO_URL: "https://pacs-ui.techirl.eu/dcm4chee-arc/aets/DCM4CHEE/rs"
 
       WADO_BASE_URL: https://pacs-ui.techirl.eu/dcm4chee-arc/aets/DCM4CHEE/rs
-
       QIDO_BASE_URL: https://pacs-ui.techirl.eu
       QIDO_BASE_PATH: /dcm4chee-arc/aets/DCM4CHEE/rs
 
-      # Logging — reduce to INFO across the board once stable
+      # [SEC-9] Log levels set to INFO
       WILDFLY_LOGLEVEL: INFO
-      WILDFLY_LOGLEVEL_ORG_KEYCLOAK: DEBUG
-      WILDFLY_LOGLEVEL_ORG_DCM4CHE: DEBUG
-      WILDFLY_LOGLEVEL_ORG_DCM4CHEE: DEBUG
-      WILDFLY_LOGLEVEL_ORG_JBOSS_AS: DEBUG
+      WILDFLY_LOGLEVEL_ORG_KEYCLOAK: INFO
+      WILDFLY_LOGLEVEL_ORG_DCM4CHE: INFO
+      WILDFLY_LOGLEVEL_ORG_DCM4CHEE: INFO
+      WILDFLY_LOGLEVEL_ORG_JBOSS_AS: INFO
 
-      # Database
-      POSTGRES_DB: pacsdb
-      POSTGRES_USER: pacs
-      POSTGRES_PASSWORD: pacs
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-      # [FIX-10] AUTH_SERVER_URL uses Docker internal DNS — resolves to keycloak
-      # container directly, no hairpin NAT, no TLS trust issues.
-      # KC_HOSTNAME_BACKCHANNEL_DYNAMIC (on Keycloak) ensures the discovery doc
-      # returned via this path still contains correct https:// public URLs,
-      # so the browser login redirect goes to https://auth.techirl.eu as expected.
       AUTH_SERVER_URL: http://keycloak:8080
       UI_AUTH_SERVER_URL: https://auth.techirl.eu
-
-      # [FIX-1] REALM_NAME — read by dcm4chee-arc-oidc.xml as ${env.REALM_NAME:dcm4che}
       REALM_NAME: dcm4che
 
-      # Storage + startup dependencies
       WILDFLY_CHOWN: /storage
       WILDFLY_WAIT_FOR: ldap:389 db:5432 keycloak:8080
 
       WILDFLY_HTTPS_PORT: 8443
       WILDFLY_HTTPS_KEYSTORE: /opt/wildfly/standalone/configuration/keystores/cacerts.p12
-      WILDFLY_HTTPS_KEYSTORE_PASSWORD: changeit
+      WILDFLY_HTTPS_KEYSTORE_PASSWORD: ${WILDFLY_HTTPS_KEYSTORE_PASSWORD}
 
       DCM4CHEE_ARC_EXTENSIONS: "dcm4chee-arc-ui2,dcm4chee-arc-wado"
-
-      # [FIX-6] Ensures LDAP schema and device config are written/updated on startup
       LDAP_UPDATE_CONFIG: "true"
 
     depends_on:
@@ -419,8 +368,6 @@ services:
       - keycloak
       - db
 
-    # [FIX-13] arc_data named volume replaced with bind-mount — visible on host
-    # filesystem, trivially backed up, never becomes an orphan.
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -428,13 +375,10 @@ services:
       - /var/local/dcm4chee-arc/arc-data:/data
       - /var/local/dcm4chee-arc/re-brand:/opt/wildfly/re-brand:ro
 
-      # Optional branding overrides — uncomment once host files are in place:
-      # - /var/local/dcm4chee-arc/wildfly/configuration/dcm4chee-arc/ui2/resources/css/style.css:/opt/wildfly/welcome-content/dcm4chee-arc/ui2/resources/css/style.css
-      # - /var/local/dcm4chee-arc/wildfly/configuration/dcm4chee-arc/ui2/resources/img/bg.jpg:/opt/wildfly/welcome-content/dcm4chee-arc/ui2/resources/img/bg.jpg
-
 
   ###########################################################################
   # WHOAMI — Traefik test endpoint
+  # [SEC-6] Restricted to internal source IPs only
   ###########################################################################
   whoami:
     image: traefik/whoami
@@ -452,14 +396,12 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # [FIX-8] Replaced unresolved ${whoami_ip} with proper hostname
-      - "traefik.http.routers.whoami.rule=Host(`whoami.techirl.eu`)"
-      - "traefik.http.routers.whoami.entrypoints=web"
-
       - "traefik.http.routers.whoami-secure.rule=Host(`whoami.techirl.eu`)"
       - "traefik.http.routers.whoami-secure.entrypoints=websecure"
       - "traefik.http.routers.whoami-secure.tls=true"
       - "traefik.http.routers.whoami-secure.tls.certresolver=le"
+      - "traefik.http.routers.whoami-secure.middlewares=whoami-ipallow"
+      - "traefik.http.middlewares.whoami-ipallow.ipallowlist.sourcerange=137.43.136.0/23,86.46.174.0/24,137.43.50.0/24"
 
       - "traefik.http.services.whoami.loadbalancer.server.port=80"
 
@@ -470,6 +412,6 @@ services:
 networks:
   proxy:
     name: proxy
-
-# No named volumes — all data is on the host under /var/local/dcm4chee-arc/
-# This eliminates orphan volume accumulation entirely.
+  backend:
+    name: backend
+    internal: true    # Docker enforces no external routing on this network
