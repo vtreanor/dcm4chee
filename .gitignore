@@ -23,3 +23,9 @@ keycloak.json
 pomerium/
 pomerium-config.yaml
 config.yaml
+
+# Dicom files (if any)
+dicom/
+
+# wiki files
+wiki/
