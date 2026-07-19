@@ -12,7 +12,7 @@
 #   [FIX-8]  whoami: unresolved ${whoami_ip} replaced with proper hostname
 #   [FIX-9]  ldap: bind-mount / named-volume path conflict resolved
 #   [FIX-10] arc: AUTH_SERVER_URL uses http://keycloak:8080 (internal DNS)
-#   [FIX-11] arc: extra_hosts — pacs-ui.techirl.eu → Docker gateway
+#   [FIX-11] arc: extra_hosts — pacs-ui.osirl.com → Docker gateway
 #   [FIX-12] keycloak: KC_HOSTNAME as full https:// URL
 #   [FIX-13] volumes: all named volumes converted to bind-mounts
 #   [SEC-1]  All credentials moved to .env file
@@ -66,7 +66,7 @@ services:
 
       - "--certificatesresolvers.le.acme.httpchallenge=true"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.le.acme.email=admin@techirl.eu"
+      - "--certificatesresolvers.le.acme.email=admin@osirl.com"
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
 
       # [SEC-8] Plain LDAP entrypoint removed — LDAPS only
@@ -81,7 +81,7 @@ services:
     # [SEC-3] Dashboard router defined via labels below
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.techirl.eu`)"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.osirl.com`)"
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.tls=true"
       - "traefik.http.routers.dashboard.tls.certresolver=le"
@@ -120,7 +120,7 @@ services:
     labels:
       - "traefik.enable=true"
 
-      - "traefik.http.routers.ohif.rule=Host(`ohif.techirl.eu`) && (PathPrefix(`/`) || PathPrefix(`/callback`))"
+      - "traefik.http.routers.ohif.rule=Host(`ohif.osirl.com`) && (PathPrefix(`/`) || PathPrefix(`/callback`))"
       - "traefik.http.routers.ohif.entrypoints=websecure"
       - "traefik.http.routers.ohif.tls=true"
       - "traefik.http.routers.ohif.tls.certresolver=le"
@@ -128,12 +128,12 @@ services:
       - "traefik.http.services.ohif.loadbalancer.server.port=80"
 
       - "traefik.http.middlewares.ohif-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
-      - "traefik.http.middlewares.ohif-headers.headers.customrequestheaders.X-Forwarded-Host=ohif.techirl.eu"
+      - "traefik.http.middlewares.ohif-headers.headers.customrequestheaders.X-Forwarded-Host=ohif.osirl.com"
       - "traefik.http.middlewares.ohif-headers.headers.customrequestheaders.X-Forwarded-Port=443"
 
       - "traefik.http.middlewares.ohif-forward.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.ohif-forward.headers.customrequestheaders.X-Forwarded-Port=443"
-      - "traefik.http.middlewares.ohif-forward.headers.customrequestheaders.X-Forwarded-Host=ohif.techirl.eu"
+      - "traefik.http.middlewares.ohif-forward.headers.customrequestheaders.X-Forwarded-Host=ohif.osirl.com"
 
       - "traefik.http.routers.ohif.middlewares=ohif-headers,ohif-forward,keycloak-headers@docker"
 
@@ -162,7 +162,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
 
-      KC_HOSTNAME: https://auth.techirl.eu
+      KC_HOSTNAME: https://auth.osirl.com
       KC_HOSTNAME_STRICT: "true"
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
 
@@ -179,19 +179,19 @@ services:
     labels:
       - "traefik.enable=true"
 
-      - "traefik.http.routers.keycloak-secure.rule=Host(`auth.techirl.eu`)"
+      - "traefik.http.routers.keycloak-secure.rule=Host(`auth.osirl.com`)"
       - "traefik.http.routers.keycloak-secure.entrypoints=websecure"
       - "traefik.http.routers.keycloak-secure.tls=true"
       - "traefik.http.routers.keycloak-secure.tls.certresolver=le"
       - "traefik.http.routers.keycloak-secure.middlewares=keycloak-headers"
 
-      - "traefik.http.routers.keycloak.rule=Host(`auth.techirl.eu`)"
+      - "traefik.http.routers.keycloak.rule=Host(`auth.osirl.com`)"
       - "traefik.http.routers.keycloak.entrypoints=web"
       - "traefik.http.routers.keycloak.middlewares=redirect-to-https"
 
       - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Port=443"
-      - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Host=auth.techirl.eu"
+      - "traefik.http.middlewares.keycloak-headers.headers.customrequestheaders.X-Forwarded-Host=auth.osirl.com"
 
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.services.keycloak.loadbalancer.server.scheme=http"
@@ -273,7 +273,7 @@ services:
         max-file: "5"
 
     extra_hosts:
-      - "pacs-ui.techirl.eu:172.22.0.1"
+      - "pacs-ui.osirl.com:172.22.0.1"
 
     labels:
       - "traefik.enable=true"
@@ -282,7 +282,7 @@ services:
       - "traefik.http.routers.arc.service=arc"
       - "traefik.http.routers.arc.priority=1000"
 
-      - "traefik.http.routers.arc-secure.rule=Host(`pacs-ui.techirl.eu`) && PathPrefix(`/dcm4chee-arc`)"
+      - "traefik.http.routers.arc-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dcm4chee-arc`)"
       - "traefik.http.routers.arc-secure.entrypoints=websecure"
       - "traefik.http.routers.arc-secure.tls=true"
       - "traefik.http.routers.arc-secure.tls.certresolver=le"
@@ -298,7 +298,7 @@ services:
       - "traefik.http.routers.dicomweb.middlewares=dicomweb-strip,dicomweb-add"
       - "traefik.http.routers.dicomweb.priority=500"
 
-      - "traefik.http.routers.dicomweb-secure.rule=Host(`pacs-ui.techirl.eu`) && PathPrefix(`/dicom-web`)"
+      - "traefik.http.routers.dicomweb-secure.rule=Host(`pacs-ui.osirl.com`) && PathPrefix(`/dicom-web`)"
       - "traefik.http.routers.dicomweb-secure.entrypoints=websecure"
       - "traefik.http.routers.dicomweb-secure.tls=true"
       - "traefik.http.routers.dicomweb-secure.tls.certresolver=le"
@@ -312,7 +312,7 @@ services:
       - "traefik.http.middlewares.dicomweb-add.addprefix.prefix=/dcm4chee-arc/aets/DCM4CHEE/rs"
 
       - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
-      - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Host=pacs-ui.techirl.eu"
+      - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Host=pacs-ui.osirl.com"
       - "traefik.http.middlewares.forward-headers.headers.customrequestheaders.X-Forwarded-Port=443"
 
     ports:
@@ -329,13 +329,13 @@ services:
       HTTP_PROXY_ADDRESS_FORWARDING: "true"
 
       ARCHIVE_DEVICE_HTTPS_SCHEME: https
-      ARCHIVE_DEVICE_HTTPS_HOST: pacs-ui.techirl.eu
+      ARCHIVE_DEVICE_HTTPS_HOST: pacs-ui.osirl.com
       ARCHIVE_DEVICE_HTTPS_PORT: 443
       ARCHIVE_DEVICE_HTTP_PORT: 80
-      ARCHIVE_DEVICE_WADO_URL: "https://pacs-ui.techirl.eu/dcm4chee-arc/aets/DCM4CHEE/rs"
+      ARCHIVE_DEVICE_WADO_URL: "https://pacs-ui.osirl.com/dcm4chee-arc/aets/DCM4CHEE/rs"
 
-      WADO_BASE_URL: https://pacs-ui.techirl.eu/dcm4chee-arc/aets/DCM4CHEE/rs
-      QIDO_BASE_URL: https://pacs-ui.techirl.eu
+      WADO_BASE_URL: https://pacs-ui.osirl.com/dcm4chee-arc/aets/DCM4CHEE/rs
+      QIDO_BASE_URL: https://pacs-ui.osirl.com
       QIDO_BASE_PATH: /dcm4chee-arc/aets/DCM4CHEE/rs
 
       # [SEC-9] Log levels set to INFO
@@ -350,7 +350,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
       AUTH_SERVER_URL: http://keycloak:8080
-      UI_AUTH_SERVER_URL: https://auth.techirl.eu
+      UI_AUTH_SERVER_URL: https://auth.osirl.com
       REALM_NAME: dcm4che
 
       WILDFLY_CHOWN: /storage
@@ -362,6 +362,7 @@ services:
 
       DCM4CHEE_ARC_EXTENSIONS: "dcm4chee-arc-ui2,dcm4chee-arc-wado"
       LDAP_UPDATE_CONFIG: "true"
+      LDAP_ROOTPASS: "secret"
 
     depends_on:
       - ldap
@@ -396,7 +397,7 @@ services:
     labels:
       - "traefik.enable=true"
 
-      - "traefik.http.routers.whoami-secure.rule=Host(`whoami.techirl.eu`)"
+      - "traefik.http.routers.whoami-secure.rule=Host(`whoami.osirl.com`)"
       - "traefik.http.routers.whoami-secure.entrypoints=websecure"
       - "traefik.http.routers.whoami-secure.tls=true"
       - "traefik.http.routers.whoami-secure.tls.certresolver=le"
