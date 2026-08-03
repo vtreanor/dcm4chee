@@ -754,8 +754,8 @@
       "clientId": "dcm4chee-arc-rs",
       "name": "",
       "description": "",
-      "rootUrl": "https://pacs-ui.techirl.eu/dcm4chee-arc",
-      "adminUrl": "https://pacs-ui.techirl.eu/dcm4chee-arc",
+      "rootUrl": "https://pacs-ui.osirl.com/dcm4chee-arc",
+      "adminUrl": "https://pacs-ui.osirl.com/dcm4chee-arc",
       "baseUrl": "",
       "surrogateAuthRequired": false,
       "enabled": true,
@@ -763,12 +763,12 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "**********",
       "redirectUris": [
-        "https://pacs-ui.techirl.eu/*",
-        "https://ohif.techirl.eu/*"
+        "https://pacs-ui.osirl.com/*",
+        "https://ohif.osirl.com/*"
       ],
       "webOrigins": [
-        "https://pacs-ui.techirl.eu",
-        "https://ohif.techirl.eu"
+        "https://pacs-ui.osirl.com",
+        "https://ohif.osirl.com"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -881,27 +881,27 @@
       "clientId": "dcm4chee-arc-ui",
       "name": "",
       "description": "Browser based login for people",
-      "rootUrl": "https://pacs-ui.techirl.eu/dcm4chee-arc/ui2/",
-      "adminUrl": "https://pacs-ui.techirl.eu/dcm4chee-arc/ui2",
+      "rootUrl": "https://pacs-ui.osirl.com/dcm4chee-arc/ui2/",
+      "adminUrl": "https://pacs-ui.osirl.com/dcm4chee-arc/ui2",
       "baseUrl": "",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": true,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "https://pacs-ui.techirl.eu/*",
+        "https://pacs-ui.osirl.com/*",
         "https://dcm4chee-arc:8443/dcm4chee-arc/ui2/*",
-        "https://pacs-ui.techirl.eu/dcm4chee-arc/*",
-        "https://pacs-ui.techirl.eu/dcm4chee-arc/ui2/*",
-        "https://pacs-ui.techirl.eu/dcm4chee-arc/ui2",
-        "http://pacs-ui.techirl.eu/dcm4chee-arc/ui2/",
-        "https://pacs-ui.techirl.eu/dcm4chee-arc/ui2/"
+        "https://pacs-ui.osirl.com/dcm4chee-arc/*",
+        "https://pacs-ui.osirl.com/dcm4chee-arc/ui2/*",
+        "https://pacs-ui.osirl.com/dcm4chee-arc/ui2",
+        "http://pacs-ui.osirl.com/dcm4chee-arc/ui2/",
+        "https://pacs-ui.osirl.com/dcm4chee-arc/ui2/"
       ],
       "webOrigins": [
-        "https://pacs-ui.techirl.eu/*",
+        "https://pacs-ui.osirl.com/*",
         "+",
-        "http://pacs-ui.techirl.eu",
-        "https://pacs-ui.techirl.eu"
+        "http://pacs-ui.osirl.com",
+        "https://pacs-ui.osirl.com"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -1250,19 +1250,19 @@
       "clientId": "ohif",
       "name": "ohiv-viewer",
       "description": "This client is being used to help understand the JWT",
-      "rootUrl": "https://ohif.techirl.eu",
-      "adminUrl": "https://ohif.techirl.eu",
+      "rootUrl": "https://ohif.osirl.com",
+      "adminUrl": "https://ohif.osirl.com",
       "baseUrl": "",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": true,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "https://ohif.techirl.eu/*",
-        "https://ohif.techirl.eu/callback*"
+        "https://ohif.osirl.com/*",
+        "https://ohif.osirl.com/callback*"
       ],
       "webOrigins": [
-        "https://ohif.techirl.eu"
+        "https://ohif.osirl.com"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -1279,7 +1279,7 @@
         "oidc.ciba.grant.enabled": "false",
         "client.secret.creation.time": "1777196207",
         "backchannel.logout.session.required": "true",
-        "post.logout.redirect.uris": "https://ohif.techirl.eu/",
+        "post.logout.redirect.uris": "https://ohif.osirl.com/",
         "oauth2.device.authorization.grant.enabled": "false",
         "display.on.consent.screen": "false",
         "backchannel.logout.revoke.offline.tokens": "false"
@@ -1350,11 +1350,11 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "**********",
       "redirectUris": [
-        "https://pacs-ui.techirl.eu/oauth2/callback",
-        "https://pacs-ui.techirl.eu/oauth2/callback/"
+        "https://pacs-ui.osirl.com/oauth2/callback",
+        "https://pacs-ui.osirl.com/oauth2/callback/"
       ],
       "webOrigins": [
-        "https://pacs-ui.techirl.eu"
+        "https://pacs-ui.osirl.com"
       ],
       "notBefore": 0,
       "bearerOnly": false,
